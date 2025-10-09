@@ -133,6 +133,7 @@ jobs:
 
     - name: Install Zalando Postgres Operator
       run: |
+        kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/postgresql.crd.yaml
         kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/configmap.yaml
         kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/postgres-operator.yaml
         kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/api-service.yaml
