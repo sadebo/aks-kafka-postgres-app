@@ -4,4 +4,13 @@ pydantic
 sqlalchemy
 databases
 asyncpg
-alembic 
+alembic
+httpx
+python-dotenv
+pandas
+fastapi
+uvicorn[standard]
+requests
+python-jose
+confluent-kafka
+pydantic

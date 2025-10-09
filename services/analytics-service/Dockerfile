@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir fastapi uvicorn
+RUN pip install --no-cache-dir pandas sqlalchemy psycopg2-binary confluent-kafka
 
 # Copy application code
 COPY . .

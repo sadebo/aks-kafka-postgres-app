@@ -1,0 +1,17 @@
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: analytics-db
+  namespace: postgres
+spec:
+  teamId: "analytics"
+  volume:
+    size: 1Gi
+  numberOfInstances: 1
+  users:
+    analytics_user:
+    - createdb
+  databases:
+    analyticsdb: analytics_user
+  postgresql:
+    version: "15"

@@ -1,0 +1,18 @@
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: orders-db
+  namespace: postgres
+spec:
+  teamId: "orders"
+  volume:
+    size: 1Gi
+  numberOfInstances: 1
+  users:
+    orders_user:
+    # operator creates user + secret
+    - createdb
+  databases:
+    ordersdb: orders_user
+  postgresql:
+    version: "15"

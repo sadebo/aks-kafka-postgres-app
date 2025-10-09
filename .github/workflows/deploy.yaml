@@ -124,18 +124,13 @@ jobs:
     - name: Install Zalando Postgres Operator
       run: |
         VERSION=v1.10.1
-        # CRD
         kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/postgresql.crd.yaml
-        # Config
         kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/configmap.yaml
-        # RBAC patched for postgres namespace
         curl -s -o operator-rbac.yaml https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/operator-service-account-rbac.yaml
         sed -i 's/namespace: default/namespace: postgres/' operator-rbac.yaml
         kubectl apply -f operator-rbac.yaml
-        # Operator + API service
         kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/postgres-operator.yaml
         kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/api-service.yaml
-        # Wait
         kubectl wait --for=condition=Established crd/postgresqls.acid.zalan.do --timeout=180s
         kubectl rollout status deployment/postgres-operator -n postgres --timeout=300s
 
@@ -144,7 +139,18 @@ jobs:
       run: |
         kubectl apply -f $K8S_DIR/kafka/kafka-cluster.yaml -n kafka
         kubectl apply -f $K8S_DIR/kafka/kafka-topics.yaml -n kafka
-        kubectl apply -f $K8S_DIR/postgres/postgres-cluster.yaml -n postgres
+
+        # apply Postgres DBs for each microservice
+        kubectl apply -f $K8S_DIR/postgres/orders-db.yaml -n postgres
+        kubectl apply -f $K8S_DIR/postgres/payments-db.yaml -n postgres
+        kubectl apply -f $K8S_DIR/postgres/inventory-db.yaml -n postgres
+        kubectl apply -f $K8S_DIR/postgres/notifications-db.yaml -n postgres
+        kubectl apply -f $K8S_DIR/postgres/analytics-db.yaml -n postgres
+
+    - name: Wait for Postgres DB reconciliation
+      run: |
+        echo "Sleeping 90s to allow Postgres operator to create DBs + secrets..."
+        sleep 90
 
     # --- Deploy Microservices ---
     - name: Deploy Microservices + Istio Gateway
@@ -170,22 +176,6 @@ jobs:
         echo "Istio ingress IP is $IP"
 
     # --- Cloudflare DNS ---
-    # - name: Update Cloudflare DNS
-    #   run: |
-    #     for sub in orders payments inventory notifications analytics; do
-    #       echo "Updating DNS for $sub.parallelservicesllc.com -> $ISTIO_IP"
-    #       curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records" \
-    #       -H "Authorization: Bearer $CF_API_TOKEN" \
-    #       -H "Content-Type: application/json" \
-    #       --data "{
-    #         \"type\":\"A\",
-    #         \"name\":\"$sub.parallelservicesllc.com\",
-    #         \"content\":\"$ISTIO_IP\",
-    #         \"ttl\":120,
-    #         \"proxied\":false
-    #       }" | jq .
-    #     done
-
     - name: Update Cloudflare DNS
       run: |
         for sub in orders payments inventory notifications analytics; do
@@ -210,5 +200,5 @@ jobs:
     - name: Inject Cloudflare API Token Secret for cert-manager
       run: |
         kubectl create secret generic cloudflare-api-token-secret \
-          --from-literal=api-token=${{ secrets.CLOUDFLARE_API_TOKEN }} \
+          --from-literal=api-token=${{ secrets.CF_API_TOKEN }} \
           -n cert-manager --dry-run=client -o yaml | kubectl apply -f -

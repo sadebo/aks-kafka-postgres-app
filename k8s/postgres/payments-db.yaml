@@ -1,0 +1,17 @@
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: payments-db
+  namespace: postgres
+spec:
+  teamId: "payments"
+  volume:
+    size: 1Gi
+  numberOfInstances: 1
+  users:
+    payments_user:
+    - createdb
+  databases:
+    paymentsdb: payments_user
+  postgresql:
+    version: "15"

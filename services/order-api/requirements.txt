@@ -6,3 +6,10 @@ sqlalchemy
 databases
 asyncpg
 alembic
+requests
+python-jose
+httpx
+python-dotenv
+pandas
+confluent-kafka
+psycopg2-binary

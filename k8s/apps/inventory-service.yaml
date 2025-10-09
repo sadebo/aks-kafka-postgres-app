@@ -16,8 +16,22 @@ spec:
       containers:
       - name: inventory-service
         image: aiinfraacr2901.azurecr.io/inventory-service:latest
-        envFrom:
-        - configMapRef:
-            name: app-config
-        - secretRef:
-            name: app-secrets
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DB_HOST
+          value: "inventory-db.postgres.svc.cluster.local"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: "inventorydb"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: inventory-db.inventory_user.credentials.postgresql.acid.zalan.do
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: inventory-db.inventory_user.credentials.postgresql.acid.zalan.do
+              key: password
