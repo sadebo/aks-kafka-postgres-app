@@ -160,3 +160,8 @@ jobs:
       run: |
         echo "Sleeping 60s to allow Cloudflare DNS to propagate before TLS issuance..."
         sleep 60
+    # --- Final Wait for TLS issuance ---
+    - name: Wait for TLS issuance
+      run: |
+        echo "Sleeping 90s to allow cert-manager to issue TLS certs..."
+        sleep 90
