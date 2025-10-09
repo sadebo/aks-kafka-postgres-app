@@ -5,8 +5,8 @@ metadata:
   namespace: istio-system
 spec:
   secretName: parallelservicesllc-com-wildcard-tls
-  duration: 90d
-  renewBefore: 15d
+  duration: 2160h # 90d = 90*24h
+  renewBefore: 360h # 15d = 15*24h
   dnsNames:
   - "parallelservicesllc.com"
   - "*.parallelservicesllc.com"
