@@ -170,23 +170,63 @@ jobs:
         echo "Istio ingress IP is $IP"
 
     # --- Cloudflare DNS ---
-    - name: Update Cloudflare DNS
+    # - name: Update Cloudflare DNS
+    #   run: |
+    #     for sub in orders payments inventory notifications analytics; do
+    #       echo "Updating DNS for $sub.parallelservicesllc.com -> $ISTIO_IP"
+    #       curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records" \
+    #       -H "Authorization: Bearer $CF_API_TOKEN" \
+    #       -H "Content-Type: application/json" \
+    #       --data "{
+    #         \"type\":\"A\",
+    #         \"name\":\"$sub.parallelservicesllc.com\",
+    #         \"content\":\"$ISTIO_IP\",
+    #         \"ttl\":120,
+    #         \"proxied\":false
+    #       }" | jq .
+    #     done
+
+    - name: Create/Update Cloudflare DNS Records
       run: |
-        for sub in orders payments inventory notifications analytics; do
-          echo "Updating DNS for $sub.parallelservicesllc.com -> $ISTIO_IP"
-          curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records" \
-          -H "Authorization: Bearer $CF_API_TOKEN" \
-          -H "Content-Type: application/json" \
-          --data "{
-            \"type\":\"A\",
-            \"name\":\"$sub.parallelservicesllc.com\",
-            \"content\":\"$ISTIO_IP\",
-            \"ttl\":120,
-            \"proxied\":false
-          }" | jq .
+        for app in orders payments inventory notifications analytics; do
+          RECORD_NAME="$app.parallelservicesllc.com"
+          EXISTING=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/dns_records?type=A&name=$RECORD_NAME" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -H "Content-Type: application/json" | jq -r '.result[0].id')
+          if [ "$EXISTING" != "null" ]; then
+            echo "Updating existing record for $RECORD_NAME"
+            curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/dns_records/$EXISTING" \
+              -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              --data '{
+                "type":"A",
+                "name":"'"$RECORD_NAME"'",
+                "content":"'"${INGRESS_IP}"'",
+                "ttl":120,
+                "proxied":true
+              }'
+          else
+            echo "Creating new record for $RECORD_NAME"
+            curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/dns_records" \
+              -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              --data '{
+                "type":"A",
+                "name":"'"$RECORD_NAME"'",
+                "content":"'"${INGRESS_IP}"'",
+                "ttl":120,
+                "proxied":true
+              }'
+          fi
         done
 
     - name: Wait for Cloudflare DNS propagation
       run: |
         echo "Sleeping 60s to allow Cloudflare DNS to propagate..."
         sleep 60
+
+    - name: Inject Cloudflare API Token Secret for cert-manager
+      run: |
+        kubectl create secret generic cloudflare-api-token-secret \
+          --from-literal=api-token=${{ secrets.CLOUDFLARE_API_TOKEN }} \
+          -n cert-manager --dry-run=client -o yaml | kubectl apply -f -
