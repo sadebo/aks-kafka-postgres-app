@@ -1,0 +1,16 @@
+apiVersion: acid.zalan.do/v1
+kind: postgresql
+metadata:
+  name: inventory-db
+  namespace: postgres
+spec:
+  teamId: "demo"
+  volume:
+    size: 1Gi
+  numberOfInstances: 1
+  users:
+    app_user: []
+  databases:
+    inventorydb: app_user
+  postgresql:
+    version: "15"

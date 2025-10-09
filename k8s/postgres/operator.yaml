@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: postgres
+---
+
+# Deploy Zalando Postgres Operator
+# Use official manifest
+# kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/configmap.yaml -n postgres
+# kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/postgres-operator.yaml -n postgres

@@ -1,0 +1,32 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: orders
+  labels:
+    strimzi.io/cluster: my-cluster
+  namespace: kafka
+spec:
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: payments
+  labels:
+    strimzi.io/cluster: my-cluster
+  namespace: kafka
+spec:
+  partitions: 3
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: inventory
+  labels:
+    strimzi.io/cluster: my-cluster
+  namespace: kafka
+spec:
+  partitions: 3
+  replicas: 1

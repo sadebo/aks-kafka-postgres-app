@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: default
+data:
+  KAFKA_BOOTSTRAP: "my-cluster-kafka-bootstrap.kafka:9092"
+  POSTGRES_HOST: "inventory-db.postgres.svc.cluster.local"
+  POSTGRES_DB: "inventorydb"

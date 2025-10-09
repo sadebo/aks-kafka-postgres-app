@@ -1,0 +1,184 @@
+name: Deploy AKS Kafka Postgres App with Istio + Cloudflare + TLS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+
+env:
+  TF_DIR: ./terraform
+  K8S_DIR: ./k8s
+  ACR_NAME: aiinfraacr2901
+  ACR_LOGIN_SERVER: aiinfraacr2901.azurecr.io
+
+  # ARM vars for Terraform + Azure CLI
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+
+  # Cloudflare
+  CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+  CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    # Terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Terraform Init
+      working-directory: ${{ env.TF_DIR }}
+      run: terraform init
+
+    - name: Terraform Apply
+      working-directory: ${{ env.TF_DIR }}
+      run: terraform apply -auto-approve
+
+    # Setup kubectl
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v4
+
+    - name: Get AKS Credentials
+      run: |
+        az login --service-principal \
+          --username $ARM_CLIENT_ID \
+          --password $ARM_CLIENT_SECRET \
+          --tenant $ARM_TENANT_ID
+        az aks get-credentials \
+          --resource-group rg-kafka-postgres-demo \
+          --name aks-kafka-postgres \
+          --overwrite-existing
+
+    # ACR Login
+    - name: ACR Login
+      run: az acr login --name $ACR_NAME
+
+    # Build & Push Images
+    - name: Build & Push Images
+      run: |
+        set -e
+        for svc in order-api payment-service inventory-service notification-service analytics-service; do
+          docker build -t $ACR_LOGIN_SERVER/$svc:latest ./services/$svc
+          docker push $ACR_LOGIN_SERVER/$svc:latest
+        done
+
+    # --- Install Istio ---
+    - name: Install Istio
+      run: |
+        curl -L https://istio.io/downloadIstio | ISTIO_VERSION=1.22.0 sh -
+        export PATH=$PWD/istio-1.22.0/bin:$PATH
+        istioctl install --set profile=demo -y
+        kubectl label namespace default istio-injection=enabled --overwrite
+        kubectl label namespace kafka istio-injection=enabled --overwrite || true
+        kubectl label namespace postgres istio-injection=enabled --overwrite || true
+
+    # --- Install cert-manager ---
+    - name: Install cert-manager
+      run: |
+        kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml
+        kubectl rollout status deployment/cert-manager -n cert-manager --timeout=300s
+        kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create secret generic cloudflare-api-token-secret \
+          --from-literal=api-token=${{ secrets.CF_API_TOKEN }} \
+          -n cert-manager --dry-run=client -o yaml | kubectl apply -f -
+        kubectl apply -f k8s/cert-manager/cluster-issuer.yaml
+        kubectl apply -f k8s/cert-manager/wildcard-certificate.yaml
+
+    # --- Sleep to allow cert-manager + DNS propagation ---
+    - name: Wait for cert-manager + DNS propagation
+      run: |
+        echo "Sleeping 90s to allow DNS challenge + cert-manager validation..."
+        sleep 90
+
+    # --- Deploy Operators ---
+    - name: Install Strimzi
+      run: |
+        kubectl apply -f "https://strimzi.io/install/latest?namespace=kafka" -n kafka
+        kubectl wait --for=condition=Established crd/kafkas.kafka.strimzi.io --timeout=180s
+        kubectl rollout status deployment/strimzi-cluster-operator -n kafka --timeout=300s
+
+    - name: Install Zalando Postgres Operator
+      run: |
+        kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/configmap.yaml
+        kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/postgres-operator.yaml
+        kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/api-service.yaml
+        kubectl wait --for=condition=Established crd/postgresqls.acid.zalan.do --timeout=180s
+        kubectl rollout status deployment/postgres-operator -n postgres --timeout=300s
+
+    # --- Deploy Apps ---
+    - name: Deploy Kafka & Postgres
+      run: |
+        kubectl apply -f $K8S_DIR/kafka/kafka-cluster.yaml -n kafka
+        kubectl apply -f $K8S_DIR/kafka/kafka-topics.yaml -n kafka
+        kubectl apply -f $K8S_DIR/postgres/postgres-cluster.yaml -n postgres
+
+    - name: Deploy Config & Apps
+      run: |
+        kubectl apply -f $K8S_DIR/apps/configmap.yaml
+        kubectl apply -f $K8S_DIR/apps/secrets.yaml
+        kubectl apply -f $K8S_DIR/apps/
+        kubectl apply -f $K8S_DIR/apps/gateway.yaml
+        kubectl apply -f $K8S_DIR/apps/virtualservices.yaml
+
+    # --- Get Istio Ingress IP ---
+    - name: Get Istio Ingress IP
+      id: istioip
+      run: |
+        IP=""
+        for i in {1..30}; do
+          IP=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          if [ -n "$IP" ]; then break; fi
+          echo "Waiting for Istio ingress IP..."
+          sleep 10
+        done
+        echo "ISTIO_IP=$IP" >> $GITHUB_ENV
+        echo "Istio ingress IP is $IP"
+
+    # --- Update Cloudflare DNS for all subdomains ---
+    - name: Update Cloudflare DNS
+      run: |
+        for sub in orders payments inventory notifications analytics; do
+          echo "Updating DNS for $sub.parallelservicesllc.com -> $ISTIO_IP"
+          curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records" \
+          -H "Authorization: Bearer $CF_API_TOKEN" \
+          -H "Content-Type: application/json" \
+          --data "{
+            \"type\":\"A\",
+            \"name\":\"$sub.parallelservicesllc.com\",
+            \"content\":\"$ISTIO_IP\",
+            \"ttl\":120,
+            \"proxied\":false
+          }" | jq .
+        done
+
+    # --- Sleep to allow DNS records to propagate ---
+    - name: Wait for Cloudflare DNS propagation
+      run: |
+        echo "Sleeping 60s to allow Cloudflare DNS to propagate before TLS issuance..."
+        sleep 60
+    # --- Verify TLS Certificates ---
+    - name: Verify TLS Certificates
+      run: |
+        for sub in orders payments inventory notifications analytics; do
+          echo "Verifying TLS certificate for $sub.parallelservicesllc.com"
+          for i in {1..30}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://$sub.parallelservicesllc.com/health)
+            if [ "$STATUS" -eq 200 ]; then
+              echo "TLS certificate for $sub.parallelservicesllc.com is valid!"
+              break
+            fi
+            echo "Waiting for TLS certificate issuance for $sub.parallelservicesllc.com..."
+            sleep 10
+          done
+        done
+        echo "All TLS certificates verified!"
+    - name: Final Status
+      run: kubectl get all -n default && kubectl get all -n kafka && kubectl get all -n postgres

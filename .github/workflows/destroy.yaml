@@ -1,0 +1,28 @@
+name: Destroy AKS Kafka Postgres App
+
+on:
+  workflow_dispatch:
+
+
+env:
+  TF_DIR: ./terraform
+
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Terraform Destroy
+      working-directory: ${{ env.TF_DIR }}
+      run: terraform destroy -auto-approve
