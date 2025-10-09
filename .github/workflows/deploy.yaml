@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-    # manual run also allowed
+
 
 env:
   TF_DIR: ./terraform
@@ -73,39 +73,49 @@ jobs:
           docker push $ACR_LOGIN_SERVER/$svc:latest
         done
 
-    # --- Install Istio (Ambient or Sidecar mode) ---
+    # --- Install Istio ---
     - name: Install Istio
       run: |
         curl -L https://istio.io/downloadIstio | ISTIO_VERSION=1.22.0 sh -
         export PATH=$PWD/istio-1.22.0/bin:$PATH
 
+        # Ensure namespaces exist before labeling
+        kubectl create namespace kafka --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace postgres --dry-run=client -o yaml | kubectl apply -f -
+
         if [ "${{ env.ISTIO_MODE }}" = "ambient" ]; then
           echo "🚀 Installing Istio in Ambient mode"
           istioctl install --set profile=ambient -y
 
-          # Label namespaces for ambient dataplane
           kubectl label namespace default istio.io/dataplane-mode=ambient --overwrite
-          kubectl label namespace kafka istio.io/dataplane-mode=ambient --overwrite || true
-          kubectl label namespace postgres istio.io/dataplane-mode=ambient --overwrite || true
+          kubectl label namespace kafka istio.io/dataplane-mode=ambient --overwrite
+          kubectl label namespace postgres istio.io/dataplane-mode=ambient --overwrite
         else
           echo "🚀 Installing Istio in Sidecar mode"
           istioctl install --set profile=demo -y
 
-          # Label namespaces for sidecar injection
-          kubectl label namespace default istio-injection=enabled --overwrite || true
-          kubectl label namespace kafka istio-injection=enabled --overwrite || true
-          kubectl label namespace postgres istio-injection=enabled --overwrite || true
+          kubectl label namespace default istio-injection=enabled --overwrite
+          kubectl label namespace kafka istio-injection=enabled --overwrite
+          kubectl label namespace postgres istio-injection=enabled --overwrite
         fi
 
     # --- Install cert-manager ---
     - name: Install cert-manager
       run: |
-        kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml
-        kubectl rollout status deployment/cert-manager -n cert-manager --timeout=300s
         kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -
+        kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml
+
+        # Wait for all cert-manager deployments
+        kubectl rollout status deployment/cert-manager -n cert-manager --timeout=300s
+        kubectl rollout status deployment/cert-manager-cainjector -n cert-manager --timeout=300s
+        kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout=300s
+
+        # Add Cloudflare secret
         kubectl create secret generic cloudflare-api-token-secret \
           --from-literal=api-token=${{ secrets.CF_API_TOKEN }} \
           -n cert-manager --dry-run=client -o yaml | kubectl apply -f -
+
+        # Now apply issuers and certs
         kubectl apply -f k8s/cert-manager/cluster-issuer.yaml
         kubectl apply -f k8s/cert-manager/wildcard-certificate.yaml
 
