@@ -186,38 +186,20 @@ jobs:
     #       }" | jq .
     #     done
 
-    - name: Create/Update Cloudflare DNS Records
+    - name: Update Cloudflare DNS
       run: |
-        for app in orders payments inventory notifications analytics; do
-          RECORD_NAME="$app.parallelservicesllc.com"
-          EXISTING=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/dns_records?type=A&name=$RECORD_NAME" \
-            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-            -H "Content-Type: application/json" | jq -r '.result[0].id')
-          if [ "$EXISTING" != "null" ]; then
-            echo "Updating existing record for $RECORD_NAME"
-            curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/dns_records/$EXISTING" \
-              -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              --data '{
-                "type":"A",
-                "name":"'"$RECORD_NAME"'",
-                "content":"'"${INGRESS_IP}"'",
-                "ttl":120,
-                "proxied":true
-              }'
-          else
-            echo "Creating new record for $RECORD_NAME"
-            curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/dns_records" \
-              -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              --data '{
-                "type":"A",
-                "name":"'"$RECORD_NAME"'",
-                "content":"'"${INGRESS_IP}"'",
-                "ttl":120,
-                "proxied":true
-              }'
-          fi
+        for sub in orders payments inventory notifications analytics; do
+          echo "Creating new record for $sub.parallelservicesllc.com"
+          curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/dns_records" \
+          -H "Authorization: Bearer ${CF_API_TOKEN}" \
+          -H "Content-Type: application/json" \
+          --data "{
+            \"type\":\"A\",
+            \"name\":\"$sub.parallelservicesllc.com\",
+            \"content\":\"$ISTIO_IP\",
+            \"ttl\":120,
+            \"proxied\":false
+          }" | jq .
         done
 
     - name: Wait for Cloudflare DNS propagation
