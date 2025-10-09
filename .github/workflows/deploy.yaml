@@ -115,7 +115,7 @@ jobs:
           --from-literal=api-token=${{ secrets.CF_API_TOKEN }} \
           -n cert-manager --dry-run=client -o yaml | kubectl apply -f -
 
-        # Now apply issuers and certs
+        # Apply issuers and certs
         kubectl apply -f k8s/cert-manager/cluster-issuer.yaml
         kubectl apply -f k8s/cert-manager/wildcard-certificate.yaml
 
@@ -133,10 +133,11 @@ jobs:
 
     - name: Install Zalando Postgres Operator
       run: |
-        kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/postgresql.crd.yaml
-        kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/configmap.yaml
-        kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/postgres-operator.yaml
-        kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/api-service.yaml
+        VERSION=v1.10.1
+        kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/postgresql.crd.yaml
+        kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/configmap.yaml
+        kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/postgres-operator.yaml
+        kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/api-service.yaml
         kubectl wait --for=condition=Established crd/postgresqls.acid.zalan.do --timeout=180s
         kubectl rollout status deployment/postgres-operator -n postgres --timeout=300s
 
@@ -190,4 +191,3 @@ jobs:
       run: |
         echo "Sleeping 60s to allow Cloudflare DNS to propagate before TLS issuance..."
         sleep 60
-    # --- Done! ---
