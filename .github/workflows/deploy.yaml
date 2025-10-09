@@ -136,7 +136,9 @@ jobs:
         VERSION=v1.10.1
         kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/postgresql.crd.yaml
         kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/configmap.yaml
+        kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/operator-service-account-rbac.yaml
         kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/postgres-operator.yaml
+        kubectl set image deployment/postgres-operator -n postgres postgres-operator=ghcr.io/zalando/postgres-operator:v1.10.1
         kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/api-service.yaml
         kubectl wait --for=condition=Established crd/postgresqls.acid.zalan.do --timeout=180s
         kubectl rollout status deployment/postgres-operator -n postgres --timeout=300s
