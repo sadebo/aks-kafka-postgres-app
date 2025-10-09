@@ -3,14 +3,14 @@ import os, json, random
 
 consumer = KafkaConsumer(
     "orders",
-    bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP", "my-cluster-kafka-bootstrap.kafka:9092"),
+    bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP", "kafka-cluster-kafka-bootstrap.kafka:9092"),
     group_id="payment-service",
     auto_offset_reset="earliest",
     value_deserializer=lambda m: json.loads(m.decode("utf-8"))
 )
 
 producer = KafkaProducer(
-    bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP", "my-cluster-kafka-bootstrap.kafka:9092"),
+    bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP", "kafka-cluster-kafka-bootstrap.kafka:9092"),
     value_serializer=lambda v: json.dumps(v).encode("utf-8")
 )
 

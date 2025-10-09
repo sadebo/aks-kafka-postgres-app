@@ -3,7 +3,7 @@ kind: KafkaTopic
 metadata:
   name: orders
   labels:
-    strimzi.io/cluster: my-cluster
+    strimzi.io/cluster: kafka-cluster
   namespace: kafka
 spec:
   partitions: 3
@@ -14,7 +14,7 @@ kind: KafkaTopic
 metadata:
   name: payments
   labels:
-    strimzi.io/cluster: my-cluster
+    strimzi.io/cluster: kafka-cluster
   namespace: kafka
 spec:
   partitions: 3
@@ -25,7 +25,7 @@ kind: KafkaTopic
 metadata:
   name: inventory
   labels:
-    strimzi.io/cluster: my-cluster
+    strimzi.io/cluster: kafka-cluster
   namespace: kafka
 spec:
   partitions: 3

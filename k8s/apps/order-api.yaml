@@ -19,6 +19,8 @@ spec:
         envFrom:
         - configMapRef:
             name: app-config
+        - secretRef:
+            name: app-secrets
         ports:
         - containerPort: 8000
 ---

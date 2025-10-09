@@ -4,6 +4,9 @@ metadata:
   name: app-config
   namespace: default
 data:
-  KAFKA_BOOTSTRAP: "my-cluster-kafka-bootstrap.kafka:9092"
-  POSTGRES_HOST: "inventory-db.postgres.svc.cluster.local"
-  POSTGRES_DB: "inventorydb"
+  KAFKA_BOOTSTRAP: "kafka-cluster-kafka-bootstrap.kafka:9092"
+  # POSTGRES_HOST: "inventory-db.postgres.svc.cluster.local"
+  # POSTGRES_DB: "inventorydb"
+  KAFKA_TOPIC: "orders"
+  # Postgres config (used by order-api, inventory, analytics)
+  DATABASE_URL: "postgresql://postgres:5432/stockdb"

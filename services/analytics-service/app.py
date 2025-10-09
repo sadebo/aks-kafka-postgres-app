@@ -1,19 +1,30 @@
-from kafka import KafkaConsumer
-import os, json
+from fastapi import FastAPI
+import pandas as pd
+from sqlalchemy import create_engine
+from confluent_kafka import Consumer
+import os
 
-topics = ["orders", "payments", "inventory"]
+app = FastAPI(title="Analytics Service")
 
-consumer = KafkaConsumer(
-    *topics,
-    bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP", "my-cluster-kafka-bootstrap.kafka:9092"),
-    group_id="analytics-service",
-    auto_offset_reset="earliest",
-    value_deserializer=lambda m: json.loads(m.decode("utf-8"))
-)
+# Database connection
+DB_URI = os.getenv("DATABASE_URL", "postgresql://user:password@postgres:5432/stockdb")
+engine = create_engine(DB_URI)
 
-print("Analytics Service running...")
+# Kafka config
+consumer = Consumer({
+    'bootstrap.servers': os.getenv("KAFKA_BOOTSTRAP", "kafka:9092"),
+    'group.id': 'analytics-service',
+    'auto.offset.reset': 'earliest'
+})
 
-for msg in consumer:
-    event = msg.value
-    print(f"[ANALYTICS] {msg.topic}: {event}")
-    # In real case: write to Postgres, Elastic, Data Lake
+consumer.subscribe([os.getenv("KAFKA_TOPIC", "orders")])
+
+@app.get("/metrics")
+def get_metrics():
+    with engine.connect() as conn:
+        result = pd.read_sql("SELECT product_id, SUM(quantity) as total_sold FROM orders GROUP BY product_id", conn)
+    return result.to_dict(orient="records")
+
+@app.get("/healthz")
+def health_check():
+    return {"status": "ok"}

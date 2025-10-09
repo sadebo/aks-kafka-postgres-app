@@ -5,7 +5,7 @@ import os, json, uuid
 app = FastAPI()
 
 producer = KafkaProducer(
-    bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP", "my-cluster-kafka-bootstrap.kafka:9092"),
+    bootstrap_servers=os.getenv("KAFKA_BOOTSTRAP", "kafka-cluster-kafka-bootstrap.kafka:9092"),
     value_serializer=lambda v: json.dumps(v).encode("utf-8")
 )
 
