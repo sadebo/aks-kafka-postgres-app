@@ -3,8 +3,6 @@ name: Deploy AKS Kafka Postgres App with Istio + Cloudflare + TLS
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:
-
 
 env:
   TF_DIR: ./terraform
@@ -12,7 +10,7 @@ env:
   ACR_NAME: aiinfraacr2901
   ACR_LOGIN_SERVER: aiinfraacr2901.azurecr.io
 
-  # ARM vars
+  # ARM credentials
   ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
   ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
   ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
@@ -22,7 +20,7 @@ env:
   CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
   CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
 
-  # 👇 Choose Istio mode: "sidecar" or "ambient"
+  # Istio mode: "sidecar" or "ambient"
   ISTIO_MODE: "sidecar"
 
 jobs:
@@ -33,7 +31,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    # Terraform
+    # --- Terraform ---
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
 
@@ -45,7 +43,7 @@ jobs:
       working-directory: ${{ env.TF_DIR }}
       run: terraform apply -auto-approve
 
-    # Setup kubectl
+    # --- kubectl ---
     - name: Setup kubectl
       uses: azure/setup-kubectl@v4
 
@@ -60,11 +58,10 @@ jobs:
           --name aks-kafka-postgres \
           --overwrite-existing
 
-    # ACR Login
+    # --- ACR ---
     - name: ACR Login
       run: az acr login --name $ACR_NAME
 
-    # Build & Push Images
     - name: Build & Push Images
       run: |
         set -e
@@ -73,83 +70,83 @@ jobs:
           docker push $ACR_LOGIN_SERVER/$svc:latest
         done
 
-    # --- Install Istio ---
+    # --- Istio ---
     - name: Install Istio
       run: |
         curl -L https://istio.io/downloadIstio | ISTIO_VERSION=1.22.0 sh -
         export PATH=$PWD/istio-1.22.0/bin:$PATH
 
-        # Ensure namespaces exist before labeling
         kubectl create namespace kafka --dry-run=client -o yaml | kubectl apply -f -
         kubectl create namespace postgres --dry-run=client -o yaml | kubectl apply -f -
 
         if [ "${{ env.ISTIO_MODE }}" = "ambient" ]; then
-          echo "🚀 Installing Istio in Ambient mode"
           istioctl install --set profile=ambient -y
-
           kubectl label namespace default istio.io/dataplane-mode=ambient --overwrite
           kubectl label namespace kafka istio.io/dataplane-mode=ambient --overwrite
           kubectl label namespace postgres istio.io/dataplane-mode=ambient --overwrite
         else
-          echo "🚀 Installing Istio in Sidecar mode"
           istioctl install --set profile=demo -y
-
           kubectl label namespace default istio-injection=enabled --overwrite
           kubectl label namespace kafka istio-injection=enabled --overwrite
           kubectl label namespace postgres istio-injection=enabled --overwrite
         fi
 
-    # --- Install cert-manager ---
+    # --- cert-manager ---
     - name: Install cert-manager
       run: |
         kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -
         kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml
 
-        # Wait for all cert-manager deployments
         kubectl rollout status deployment/cert-manager -n cert-manager --timeout=300s
         kubectl rollout status deployment/cert-manager-cainjector -n cert-manager --timeout=300s
         kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout=300s
 
-        # Add Cloudflare secret
         kubectl create secret generic cloudflare-api-token-secret \
           --from-literal=api-token=${{ secrets.CF_API_TOKEN }} \
           -n cert-manager --dry-run=client -o yaml | kubectl apply -f -
 
-        # Apply issuers and certs
         kubectl apply -f k8s/cert-manager/cluster-issuer.yaml
         kubectl apply -f k8s/cert-manager/wildcard-certificate.yaml
 
     - name: Wait for cert-manager + DNS propagation
       run: |
-        echo "Sleeping 90s to allow DNS challenge + cert-manager validation..."
+        echo "Sleeping 90s to allow DNS + cert-manager validation..."
         sleep 90
 
-    # --- Deploy Operators ---
+    # --- Kafka Operator ---
     - name: Install Strimzi (Kafka Operator)
       run: |
         kubectl apply -f "https://strimzi.io/install/latest?namespace=kafka" -n kafka
         kubectl wait --for=condition=Established crd/kafkas.kafka.strimzi.io --timeout=180s
         kubectl rollout status deployment/strimzi-cluster-operator -n kafka --timeout=300s
 
+    # --- Postgres Operator ---
     - name: Install Zalando Postgres Operator
       run: |
         VERSION=v1.10.1
+        # CRD
         kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/postgresql.crd.yaml
+        # Config
         kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/configmap.yaml
-        kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/operator-service-account-rbac.yaml
+        # RBAC patched for postgres namespace
+        curl -s -o operator-rbac.yaml https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/operator-service-account-rbac.yaml
+        sed -i 's/namespace: default/namespace: postgres/' operator-rbac.yaml
+        kubectl apply -f operator-rbac.yaml
+        # Operator + API service
         kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/postgres-operator.yaml
-        kubectl set image deployment/postgres-operator -n postgres postgres-operator=ghcr.io/zalando/postgres-operator:v1.10.1
         kubectl apply -n postgres -f https://raw.githubusercontent.com/zalando/postgres-operator/$VERSION/manifests/api-service.yaml
+        # Wait
         kubectl wait --for=condition=Established crd/postgresqls.acid.zalan.do --timeout=180s
         kubectl rollout status deployment/postgres-operator -n postgres --timeout=300s
 
-    # --- Deploy Apps ---
+    # --- Deploy Clusters ---
     - name: Deploy Kafka & Postgres clusters
       run: |
         kubectl apply -f $K8S_DIR/kafka/kafka-cluster.yaml -n kafka
         kubectl apply -f $K8S_DIR/kafka/kafka-topics.yaml -n kafka
         kubectl apply -f $K8S_DIR/postgres/postgres-cluster.yaml -n postgres
 
+    # --- Deploy Microservices ---
     - name: Deploy Microservices + Istio Gateway
       run: |
         kubectl apply -f $K8S_DIR/apps/configmap.yaml
@@ -158,7 +155,7 @@ jobs:
         kubectl apply -f $K8S_DIR/apps/gateway.yaml
         kubectl apply -f $K8S_DIR/apps/virtualservices.yaml
 
-    # --- Get Istio Ingress IP ---
+    # --- Istio Ingress ---
     - name: Get Istio Ingress IP
       id: istioip
       run: |
@@ -172,7 +169,7 @@ jobs:
         echo "ISTIO_IP=$IP" >> $GITHUB_ENV
         echo "Istio ingress IP is $IP"
 
-    # --- Update Cloudflare DNS ---
+    # --- Cloudflare DNS ---
     - name: Update Cloudflare DNS
       run: |
         for sub in orders payments inventory notifications analytics; do
@@ -191,5 +188,5 @@ jobs:
 
     - name: Wait for Cloudflare DNS propagation
       run: |
-        echo "Sleeping 60s to allow Cloudflare DNS to propagate before TLS issuance..."
+        echo "Sleeping 60s to allow Cloudflare DNS to propagate..."
         sleep 60
