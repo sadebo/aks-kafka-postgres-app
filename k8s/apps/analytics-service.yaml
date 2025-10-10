@@ -18,20 +18,6 @@ spec:
         image: aiinfraacr2901.azurecr.io/analytics-service:latest
         ports:
         - containerPort: 8000
-        env:
-        - name: DB_USER
-          valueFrom:
-            secretKeyRef:
-              name: analytics-user.analytics-db.credentials.postgresql.acid.zalan.do
-              key: username
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: analytics-user.analytics-db.credentials.postgresql.acid.zalan.do
-              key: password
-        - name: DB_HOST
-          value: analytics-db.postgres.svc.cluster.local
-        - name: DB_PORT
-          value: "5432"
-        - name: DB_NAME
-          value: analyticsdb
+        envFrom:
+        - secretRef:
+            name: analytics-db-credentials

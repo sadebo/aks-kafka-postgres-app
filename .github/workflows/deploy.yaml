@@ -152,15 +152,31 @@ jobs:
         echo "Sleeping 90s to allow Postgres operator to create DBs + secrets..."
         sleep 90
 
-    # --- Sync Secrets into default namespace ---
-    - name: Sync Postgres secrets into default namespace
+    # --- Sync DB Secrets into default namespace ---
+    - name: Sync Postgres Secrets
       run: |
-        for svc in orders payments inventory notifications analytics; do
-          secret_name="${svc}-user.${svc}-db.credentials.postgresql.acid.zalan.do"
-          echo "Syncing $secret_name from postgres -> default"
-          kubectl get secret $secret_name -n postgres -o yaml \
-            | sed 's/namespace: postgres/namespace: default/' \
-            | kubectl apply -f -
+        declare -A DBS=(
+          ["orders-db"]="ordersdb"
+          ["payments-db"]="paymentsdb"
+          ["inventory-db"]="inventorydb"
+          ["notifications-db"]="notificationsdb"
+          ["analytics-db"]="analyticsdb"
+        )
+
+        for db in "${!DBS[@]}"; do
+          user="${db%%-*}_user"
+          secret_name="${user}.${db}.credentials.postgresql.acid.zalan.do"
+
+          echo "🔹 Syncing credentials for $db ($user)"
+
+          kubectl create secret generic ${db}-credentials \
+            -n default \
+            --from-literal=username=$(kubectl get secret $secret_name -n postgres -o jsonpath='{.data.username}' | base64 -d) \
+            --from-literal=password=$(kubectl get secret $secret_name -n postgres -o jsonpath='{.data.password}' | base64 -d) \
+            --from-literal=host=${db}.postgres.svc.cluster.local \
+            --from-literal=port=5432 \
+            --from-literal=dbname=${DBS[$db]} \
+            --dry-run=client -o yaml | kubectl apply -f -
         done
 
     # --- Deploy Microservices ---
@@ -171,45 +187,3 @@ jobs:
         kubectl apply -f $K8S_DIR/apps/
         kubectl apply -f $K8S_DIR/apps/gateway.yaml
         kubectl apply -f $K8S_DIR/apps/virtualservices.yaml
-
-    # --- Istio Ingress ---
-    - name: Get Istio Ingress IP
-      id: istioip
-      run: |
-        IP=""
-        for i in {1..30}; do
-          IP=$(kubectl get svc istio-ingressgateway -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-          if [ -n "$IP" ]; then break; fi
-          echo "Waiting for Istio ingress IP..."
-          sleep 10
-        done
-        echo "ISTIO_IP=$IP" >> $GITHUB_ENV
-        echo "Istio ingress IP is $IP"
-
-    # --- Cloudflare DNS ---
-    - name: Update Cloudflare DNS
-      run: |
-        for sub in orders payments inventory notifications analytics; do
-          echo "Creating new record for $sub.parallelservicesllc.com"
-          curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/dns_records" \
-          -H "Authorization: Bearer ${CF_API_TOKEN}" \
-          -H "Content-Type: application/json" \
-          --data "{
-            \"type\":\"A\",
-            \"name\":\"$sub.parallelservicesllc.com\",
-            \"content\":\"$ISTIO_IP\",
-            \"ttl\":120,
-            \"proxied\":false
-          }" | jq .
-        done
-
-    - name: Wait for Cloudflare DNS propagation
-      run: |
-        echo "Sleeping 60s to allow Cloudflare DNS to propagate..."
-        sleep 60
-
-    - name: Inject Cloudflare API Token Secret for cert-manager
-      run: |
-        kubectl create secret generic cloudflare-api-token-secret \
-          --from-literal=api-token=${{ secrets.CF_API_TOKEN }} \
-          -n cert-manager --dry-run=client -o yaml | kubectl apply -f -

@@ -18,20 +18,6 @@ spec:
         image: aiinfraacr2901.azurecr.io/payment-service:latest
         ports:
         - containerPort: 8000
-        env:
-        - name: DB_USER
-          valueFrom:
-            secretKeyRef:
-              name: payments-user.payments-db.credentials.postgresql.acid.zalan.do
-              key: username
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: payments-user.payments-db.credentials.postgresql.acid.zalan.do
-              key: password
-        - name: DB_HOST
-          value: payments-db.postgres.svc.cluster.local
-        - name: DB_PORT
-          value: "5432"
-        - name: DB_NAME
-          value: paymentsdb
+        envFrom:
+        - secretRef:
+            name: payments-db-credentials

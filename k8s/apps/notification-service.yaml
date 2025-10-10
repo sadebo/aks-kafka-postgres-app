@@ -18,20 +18,6 @@ spec:
         image: aiinfraacr2901.azurecr.io/notification-service:latest
         ports:
         - containerPort: 8000
-        env:
-        - name: DB_USER
-          valueFrom:
-            secretKeyRef:
-              name: notifications-user.notifications-db.credentials.postgresql.acid.zalan.do
-              key: username
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: notifications-user.notifications-db.credentials.postgresql.acid.zalan.do
-              key: password
-        - name: DB_HOST
-          value: notifications-db.postgres.svc.cluster.local
-        - name: DB_PORT
-          value: "5432"
-        - name: DB_NAME
-          value: notificationsdb
+        envFrom:
+        - secretRef:
+            name: notifications-db-credentials
