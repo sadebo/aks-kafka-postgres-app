@@ -1,17 +1,16 @@
-apiVersion: "acid.zalan.do/v1"
+apiVersion: acid.zalan.do/v1
 kind: postgresql
 metadata:
   name: analytics-db
   namespace: postgres
 spec:
   teamId: "analytics"
+  numberOfInstances: 1
+  postgresql:
+    version: "15"
   volume:
     size: 1Gi
-  numberOfInstances: 1
   users:
     analytics_user: []
   databases:
     analyticsdb: analytics_user
-  postgresql:
-    version: "15"
-  secretNameTemplate: "{cluster}-{username}-credentials"

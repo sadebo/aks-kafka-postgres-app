@@ -1,17 +1,16 @@
-apiVersion: "acid.zalan.do/v1"
+apiVersion: acid.zalan.do/v1
 kind: postgresql
 metadata:
   name: orders-db
   namespace: postgres
 spec:
   teamId: "orders"
-  volume:
-    size: 1Gi
   numberOfInstances: 1
-  users:
-    orders_user: []
-  databases:
-    ordersdb: orders_user
   postgresql:
     version: "15"
-  secretNameTemplate: "{cluster}-{username}-credentials"
+  volume:
+    size: 1Gi
+  users:
+    orders_user: [] # user created
+  databases:
+    ordersdb: orders_user # db owned by orders_user

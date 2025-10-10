@@ -19,19 +19,28 @@ spec:
         ports:
         - containerPort: 8000
         env:
-        - name: DB_HOST
-          value: "notifications-db.postgres.svc.cluster.local"
-        - name: DB_PORT
-          value: "5432"
-        - name: DB_NAME
-          value: "notificationsdb"
-        - name: DB_USER
+        - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
-              name: notifications-db-notifications_user-credentials
+              name: notifications-db-notifications_user.credentials.postgresql.acid.zalan.do
               key: username
-        - name: DB_PASSWORD
+        - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: notifications-db-notifications_user-credentials
+              name: notifications-db-notifications_user.credentials.postgresql.acid.zalan.do
               key: password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: notifications-db-notifications_user.credentials.postgresql.acid.zalan.do
+              key: dbname
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: notifications-db-notifications_user.credentials.postgresql.acid.zalan.do
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: notifications-db-notifications_user.credentials.postgresql.acid.zalan.do
+              key: port
