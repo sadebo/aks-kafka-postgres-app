@@ -15,11 +15,11 @@ producer = KafkaProducer(
 )
 
 conn = psycopg2.connect(
-    dbname=os.getenv("POSTGRES_DB", "inventorydb"),
-    user=os.getenv("POSTGRES_USER", "postgres"),
-    password=os.getenv("POSTGRES_PASSWORD", "password"),
-    host=os.getenv("POSTGRES_HOST", "inventory-db.postgres.svc.cluster.local"),
-    port="5432"
+    dbname=os.getenv("dbname"),
+    user=os.getenv("username"),
+    password=os.getenv("password"),
+    host=os.getenv("host"),
+    port=os.getenv("port")
 )
 cur = conn.cursor()
 
