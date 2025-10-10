@@ -9,9 +9,9 @@ spec:
     size: 1Gi
   numberOfInstances: 1
   users:
-    analytics_user:
-    - createdb
+    analytics_user: []
   databases:
     analyticsdb: analytics_user
   postgresql:
     version: "15"
+  secretNameTemplate: "{cluster}-{username}-credentials"

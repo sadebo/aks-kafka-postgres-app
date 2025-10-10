@@ -9,10 +9,9 @@ spec:
     size: 1Gi
   numberOfInstances: 1
   users:
-    inventory_user:
-    # <-- Operator will create this user
-    - createdb
+    inventory_user: []
   databases:
     inventorydb: inventory_user
   postgresql:
     version: "15"
+  secretNameTemplate: "{cluster}-{username}-credentials"

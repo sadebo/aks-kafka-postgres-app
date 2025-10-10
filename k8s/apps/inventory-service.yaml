@@ -28,10 +28,10 @@ spec:
         - name: DB_USER
           valueFrom:
             secretKeyRef:
-              name: inventory-db.inventory_user.credentials.postgresql.acid.zalan.do
+              name: inventory-db-inventory_user-credentials
               key: username
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: inventory-db.inventory_user.credentials.postgresql.acid.zalan.do
+              name: inventory-db-inventory_user-credentials
               key: password

@@ -9,9 +9,9 @@ spec:
     size: 1Gi
   numberOfInstances: 1
   users:
-    payments_user:
-    - createdb
+    payments_user: []
   databases:
     paymentsdb: payments_user
   postgresql:
     version: "15"
+  secretNameTemplate: "{cluster}-{username}-credentials"

@@ -9,10 +9,9 @@ spec:
     size: 1Gi
   numberOfInstances: 1
   users:
-    orders_user:
-    # operator creates user + secret
-    - createdb
+    orders_user: []
   databases:
     ordersdb: orders_user
   postgresql:
     version: "15"
+  secretNameTemplate: "{cluster}-{username}-credentials"

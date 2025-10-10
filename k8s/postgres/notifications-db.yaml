@@ -9,9 +9,9 @@ spec:
     size: 1Gi
   numberOfInstances: 1
   users:
-    notifications_user:
-    - createdb
+    notifications_user: []
   databases:
     notificationsdb: notifications_user
   postgresql:
     version: "15"
+  secretNameTemplate: "{cluster}-{username}-credentials"
