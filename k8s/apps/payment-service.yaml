@@ -13,31 +13,25 @@ spec:
       labels:
         app: payment-service
     spec:
-      imagePullSecrets:
-      - name: acr-secret
       containers:
       - name: payment-service
         image: aiinfraacr2901.azurecr.io/payment-service:latest
         ports:
-        - containerPort: 8080
+        - containerPort: 8000
         env:
         - name: DB_USER
           valueFrom:
             secretKeyRef:
-              name: payments_user.payments-db.credentials.postgresql.acid.zalan.do
+              name: payments-user.payments-db.credentials.postgresql.acid.zalan.do
               key: username
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: payments_user.payments-db.credentials.postgresql.acid.zalan.do
+              name: payments-user.payments-db.credentials.postgresql.acid.zalan.do
               key: password
         - name: DB_HOST
-          valueFrom:
-            secretKeyRef:
-              name: payments_user.payments-db.credentials.postgresql.acid.zalan.do
-              key: host
+          value: payments-db.postgres.svc.cluster.local
         - name: DB_PORT
-          valueFrom:
-            secretKeyRef:
-              name: payments_user.payments-db.credentials.postgresql.acid.zalan.do
-              key: port
+          value: "5432"
+        - name: DB_NAME
+          value: paymentsdb

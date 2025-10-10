@@ -13,34 +13,28 @@ spec:
       labels:
         app: order-api
     spec:
-      imagePullSecrets:
-      - name: acr-secret
       containers:
       - name: order-api
         image: aiinfraacr2901.azurecr.io/order-api:latest
         ports:
-        - containerPort: 8080
+        - containerPort: 8000
         env:
         - name: DB_USER
           valueFrom:
             secretKeyRef:
-              name: orders_user.orders-db.credentials.postgresql.acid.zalan.do
+              name: orders-user.orders-db.credentials.postgresql.acid.zalan.do
               key: username
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: orders_user.orders-db.credentials.postgresql.acid.zalan.do
+              name: orders-user.orders-db.credentials.postgresql.acid.zalan.do
               key: password
         - name: DB_HOST
-          valueFrom:
-            secretKeyRef:
-              name: orders_user.orders-db.credentials.postgresql.acid.zalan.do
-              key: host
+          value: orders-db.postgres.svc.cluster.local
         - name: DB_PORT
-          valueFrom:
-            secretKeyRef:
-              name: orders_user.orders-db.credentials.postgresql.acid.zalan.do
-              key: port
+          value: "5432"
+        - name: DB_NAME
+          value: ordersdb
 ---
 apiVersion: v1
 kind: Service

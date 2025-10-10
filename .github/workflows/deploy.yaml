@@ -152,15 +152,16 @@ jobs:
         echo "Sleeping 90s to allow Postgres operator to create DBs + secrets..."
         sleep 90
 
-    # --- ACR Secret for Image Pulls ---
-    - name: Create ACR Secret
+    # --- Sync Secrets into default namespace ---
+    - name: Sync Postgres secrets into default namespace
       run: |
-        ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query "passwords[0].value" -o tsv)
-        kubectl create secret docker-registry acr-secret \
-          --docker-server=$ACR_LOGIN_SERVER \
-          --docker-username=$ACR_NAME \
-          --docker-password=$ACR_PASSWORD \
-          -n default --dry-run=client -o yaml | kubectl apply -f -
+        for svc in orders payments inventory notifications analytics; do
+          secret_name="${svc}-user.${svc}-db.credentials.postgresql.acid.zalan.do"
+          echo "Syncing $secret_name from postgres -> default"
+          kubectl get secret $secret_name -n postgres -o yaml \
+            | sed 's/namespace: postgres/namespace: default/' \
+            | kubectl apply -f -
+        done
 
     # --- Deploy Microservices ---
     - name: Deploy Microservices + Istio Gateway
@@ -206,3 +207,9 @@ jobs:
       run: |
         echo "Sleeping 60s to allow Cloudflare DNS to propagate..."
         sleep 60
+
+    - name: Inject Cloudflare API Token Secret for cert-manager
+      run: |
+        kubectl create secret generic cloudflare-api-token-secret \
+          --from-literal=api-token=${{ secrets.CF_API_TOKEN }} \
+          -n cert-manager --dry-run=client -o yaml | kubectl apply -f -

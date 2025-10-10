@@ -13,31 +13,25 @@ spec:
       labels:
         app: analytics-service
     spec:
-      imagePullSecrets:
-      - name: acr-secret
       containers:
       - name: analytics-service
         image: aiinfraacr2901.azurecr.io/analytics-service:latest
         ports:
-        - containerPort: 8080
+        - containerPort: 8000
         env:
         - name: DB_USER
           valueFrom:
             secretKeyRef:
-              name: analytics_user.analytics-db.credentials.postgresql.acid.zalan.do
+              name: analytics-user.analytics-db.credentials.postgresql.acid.zalan.do
               key: username
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: analytics_user.analytics-db.credentials.postgresql.acid.zalan.do
+              name: analytics-user.analytics-db.credentials.postgresql.acid.zalan.do
               key: password
         - name: DB_HOST
-          valueFrom:
-            secretKeyRef:
-              name: analytics_user.analytics-db.credentials.postgresql.acid.zalan.do
-              key: host
+          value: analytics-db.postgres.svc.cluster.local
         - name: DB_PORT
-          valueFrom:
-            secretKeyRef:
-              name: analytics_user.analytics-db.credentials.postgresql.acid.zalan.do
-              key: port
+          value: "5432"
+        - name: DB_NAME
+          value: analyticsdb
