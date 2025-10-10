@@ -147,23 +147,25 @@ jobs:
         kubectl apply -f $K8S_DIR/postgres/notifications-db.yaml -n postgres
         kubectl apply -f $K8S_DIR/postgres/analytics-db.yaml -n postgres
 
-    # --- Wait for Postgres Secrets ---
-    - name: Wait for Postgres DB secrets
+    # --- Wait for Postgres secrets ---
+    - name: Wait for Postgres Secrets
       run: |
         set -e
-        for secret in \
-          orders-db-orders_user-credentials \
-          payments-db-payments_user-credentials \
-          inventory-db-inventory_user-credentials \
-          notifications-db-notifications_user-credentials \
-          analytics-db-analytics_user-credentials; do
-          echo "Waiting for secret $secret in namespace postgres..."
+        declare -a SECRETS=(
+          "orders-user.orders-db.credentials.postgresql.acid.zalan.do"
+          "payments-user.payments-db.credentials.postgresql.acid.zalan.do"
+          "inventory-user.inventory-db.credentials.postgresql.acid.zalan.do"
+          "notifications-user.notifications-db.credentials.postgresql.acid.zalan.do"
+          "analytics-user.analytics-db.credentials.postgresql.acid.zalan.do"
+        )
+        for sec in "${SECRETS[@]}"; do
+          echo "⏳ Waiting for secret $sec in namespace postgres..."
           for i in {1..30}; do
-            if kubectl get secret $secret -n postgres >/dev/null 2>&1; then
-              echo "Secret $secret is ready."
+            if kubectl get secret "$sec" -n postgres >/dev/null 2>&1; then
+              echo "✅ Secret $sec is ready!"
               break
             fi
-            echo "Still waiting for $secret..."
+            echo "Still waiting for $sec..."
             sleep 10
           done
         done

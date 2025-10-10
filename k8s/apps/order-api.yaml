@@ -1,48 +1,45 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: order-api
+  name: orders-service
   namespace: default
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: order-api
+      app: orders-service
   template:
     metadata:
       labels:
-        app: order-api
+        app: orders-service
     spec:
       containers:
-      - name: order-api
-        image: aiinfraacr2901.azurecr.io/order-api:latest
+      - name: orders-service
+        image: aiinfraacr2901.azurecr.io/orders-service:latest
         ports:
         - containerPort: 8000
         env:
-        - name: POSTGRES_USER
+        - name: DB_NAME
+          value: "ordersdb"
+        - name: DB_USER
           valueFrom:
             secretKeyRef:
-              name: orders-db-orders_user.credentials.postgresql.acid.zalan.do
+              name: orders-user.orders-db.credentials.postgresql.acid.zalan.do
               key: username
-        - name: POSTGRES_PASSWORD
+        - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: orders-db-orders_user.credentials.postgresql.acid.zalan.do
+              name: orders-user.orders-db.credentials.postgresql.acid.zalan.do
               key: password
-        - name: POSTGRES_DB
+        - name: DB_HOST
           valueFrom:
             secretKeyRef:
-              name: orders-db-orders_user.credentials.postgresql.acid.zalan.do
-              key: dbname
-        - name: POSTGRES_HOST
-          valueFrom:
-            secretKeyRef:
-              name: orders-db-orders_user.credentials.postgresql.acid.zalan.do
+              name: orders-user.orders-db.credentials.postgresql.acid.zalan.do
               key: host
-        - name: POSTGRES_PORT
+        - name: DB_PORT
           valueFrom:
             secretKeyRef:
-              name: orders-db-orders_user.credentials.postgresql.acid.zalan.do
+              name: orders-user.orders-db.credentials.postgresql.acid.zalan.do
               key: port
 ---
 apiVersion: v1
