@@ -1,54 +1,55 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: orders-service
+  name: order-api
   namespace: default
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: orders-service
+      app: order-api
   template:
     metadata:
       labels:
-        app: orders-service
+        app: order-api
     spec:
+      imagePullSecrets:
+      - name: acr-secret
       containers:
-      - name: orders-service
-        image: aiinfraacr2901.azurecr.io/orders-service:latest
+      - name: order-api
+        image: aiinfraacr2901.azurecr.io/order-api:latest
         ports:
-        - containerPort: 8000
+        - containerPort: 8080
         env:
-        - name: DB_NAME
-          value: "ordersdb"
         - name: DB_USER
           valueFrom:
             secretKeyRef:
-              name: orders-user.orders-db.credentials.postgresql.acid.zalan.do
+              name: orders_user.orders-db.credentials.postgresql.acid.zalan.do
               key: username
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: orders-user.orders-db.credentials.postgresql.acid.zalan.do
+              name: orders_user.orders-db.credentials.postgresql.acid.zalan.do
               key: password
         - name: DB_HOST
           valueFrom:
             secretKeyRef:
-              name: orders-user.orders-db.credentials.postgresql.acid.zalan.do
+              name: orders_user.orders-db.credentials.postgresql.acid.zalan.do
               key: host
         - name: DB_PORT
           valueFrom:
             secretKeyRef:
-              name: orders-user.orders-db.credentials.postgresql.acid.zalan.do
+              name: orders_user.orders-db.credentials.postgresql.acid.zalan.do
               key: port
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: order-api
+  namespace: default
 spec:
   selector:
     app: order-api
   ports:
   - port: 80
-    targetPort: 8000
+    targetPort: 8080

@@ -147,28 +147,20 @@ jobs:
         kubectl apply -f $K8S_DIR/postgres/notifications-db.yaml -n postgres
         kubectl apply -f $K8S_DIR/postgres/analytics-db.yaml -n postgres
 
-    # --- Wait for Postgres secrets ---
-    - name: Wait for Postgres Secrets
+    - name: Wait for Postgres DB reconciliation
       run: |
-        set -e
-        declare -a SECRETS=(
-          "orders-user.orders-db.credentials.postgresql.acid.zalan.do"
-          "payments-user.payments-db.credentials.postgresql.acid.zalan.do"
-          "inventory-user.inventory-db.credentials.postgresql.acid.zalan.do"
-          "notifications-user.notifications-db.credentials.postgresql.acid.zalan.do"
-          "analytics-user.analytics-db.credentials.postgresql.acid.zalan.do"
-        )
-        for sec in "${SECRETS[@]}"; do
-          echo "⏳ Waiting for secret $sec in namespace postgres..."
-          for i in {1..30}; do
-            if kubectl get secret "$sec" -n postgres >/dev/null 2>&1; then
-              echo "✅ Secret $sec is ready!"
-              break
-            fi
-            echo "Still waiting for $sec..."
-            sleep 10
-          done
-        done
+        echo "Sleeping 90s to allow Postgres operator to create DBs + secrets..."
+        sleep 90
+
+    # --- ACR Secret for Image Pulls ---
+    - name: Create ACR Secret
+      run: |
+        ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query "passwords[0].value" -o tsv)
+        kubectl create secret docker-registry acr-secret \
+          --docker-server=$ACR_LOGIN_SERVER \
+          --docker-username=$ACR_NAME \
+          --docker-password=$ACR_PASSWORD \
+          -n default --dry-run=client -o yaml | kubectl apply -f -
 
     # --- Deploy Microservices ---
     - name: Deploy Microservices + Istio Gateway
@@ -178,15 +170,6 @@ jobs:
         kubectl apply -f $K8S_DIR/apps/
         kubectl apply -f $K8S_DIR/apps/gateway.yaml
         kubectl apply -f $K8S_DIR/apps/virtualservices.yaml
-
-    # --- Verify Microservices Rollout ---
-    - name: Verify all microservices are running
-      run: |
-        set -e
-        for svc in order-api payment-service inventory-service notification-service analytics-service; do
-          echo "Checking rollout status for $svc..."
-          kubectl rollout status deployment/$svc -n default --timeout=300s
-        done
 
     # --- Istio Ingress ---
     - name: Get Istio Ingress IP
@@ -223,9 +206,3 @@ jobs:
       run: |
         echo "Sleeping 60s to allow Cloudflare DNS to propagate..."
         sleep 60
-
-    - name: Inject Cloudflare API Token Secret for cert-manager
-      run: |
-        kubectl create secret generic cloudflare-api-token-secret \
-          --from-literal=api-token=${{ secrets.CF_API_TOKEN }} \
-          -n cert-manager --dry-run=client -o yaml | kubectl apply -f -

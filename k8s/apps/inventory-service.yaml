@@ -13,31 +13,31 @@ spec:
       labels:
         app: inventory-service
     spec:
+      imagePullSecrets:
+      - name: acr-secret
       containers:
       - name: inventory-service
         image: aiinfraacr2901.azurecr.io/inventory-service:latest
         ports:
-        - containerPort: 8000
+        - containerPort: 8080
         env:
-        - name: DB_NAME
-          value: "inventorydb"
         - name: DB_USER
           valueFrom:
             secretKeyRef:
-              name: inventory-user.inventory-db.credentials.postgresql.acid.zalan.do
+              name: inventory_user.inventory-db.credentials.postgresql.acid.zalan.do
               key: username
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: inventory-user.inventory-db.credentials.postgresql.acid.zalan.do
+              name: inventory_user.inventory-db.credentials.postgresql.acid.zalan.do
               key: password
         - name: DB_HOST
           valueFrom:
             secretKeyRef:
-              name: inventory-user.inventory-db.credentials.postgresql.acid.zalan.do
+              name: inventory_user.inventory-db.credentials.postgresql.acid.zalan.do
               key: host
         - name: DB_PORT
           valueFrom:
             secretKeyRef:
-              name: inventory-user.inventory-db.credentials.postgresql.acid.zalan.do
+              name: inventory_user.inventory-db.credentials.postgresql.acid.zalan.do
               key: port
